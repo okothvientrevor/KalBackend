@@ -2,7 +2,7 @@
 
 A modern, full-featured internal web application for KAL Engineering Services Ltd, built with React, TypeScript, Firebase, Tailwind CSS, and Framer Motion.
 
-![KAL Engineering](public/favicon.svg)
+<!-- ![KAL Engineering](public/favicon.svg) -->
 
 ## 🚀 Features
 

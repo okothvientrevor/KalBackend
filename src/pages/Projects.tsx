@@ -9,12 +9,13 @@ import {
   CurrencyDollarIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
-import { collection, query, getDocs, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Project, ProjectStatus } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import ProjectModal from '../components/projects/ProjectModal';
 
 const Projects: React.FC = () => {
   const { userProfile: _userProfile, currentUser: _currentUser } = useAuth();
@@ -22,43 +23,42 @@ const Projects: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
+  const [isProjectModalOpen, setProjectModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchProjects();
+    const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      try {
+        const projectData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          name: doc.data().name || 'Unnamed Project',
+          description: doc.data().description || '',
+          status: doc.data().status || 'not_started',
+          progress: doc.data().progress || 0,
+          budget: doc.data().budget || 0,
+          managerName: doc.data().managerName || 'Unassigned',
+          teamMembers: doc.data().teamMembers || [],
+          startDate: doc.data().startDate?.toDate() || new Date(),
+          endDate: doc.data().endDate?.toDate() || new Date(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        })) as Project[];
+        setProjects(projectData);
+        setLoading(false); // Update loading state
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        toast.error('Failed to load projects');
+        setLoading(false); // Ensure loading state is updated
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const fetchProjects = async () => {
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Projects fetch timeout')), 5000);
-      });
-      const projectsQuery = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
-      const promise = getDocs(projectsQuery);
-      const snapshot = await Promise.race([promise, timeoutPromise]);
-      const projectsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        startDate: doc.data().startDate?.toDate() || new Date(),
-        endDate: doc.data().endDate?.toDate() || new Date(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-      })) as Project[];
-      setProjects(projectsData);
-    } catch (error) {
-      // Handle timeout silently - don't log timeout errors
-      if (!(error instanceof Error) || !error.message.includes('timeout')) {
-        console.error('Error fetching projects:', error);
-      }
-      toast.error('Failed to load projects');
-      setProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const filteredProjects = projects.filter((project) => {
-    const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (project.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (project.description?.toLowerCase() || '').includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -70,6 +70,24 @@ const Projects: React.FC = () => {
     delayed: 'bg-red-100 text-red-700',
     completed: 'bg-green-100 text-green-700',
     cancelled: 'bg-gray-300 text-gray-700',
+  };
+
+  const toggleProjectModal = () => {
+    setProjectModalOpen((prev) => !prev);
+  };
+
+  const handleProjectSubmit = async (projectData: Partial<Project>) => {
+    try {
+      // Add project to Firestore
+      const projectRef = await addDoc(collection(db, 'projects'), {
+        ...projectData,
+        createdAt: serverTimestamp(),
+      });
+      console.log('Project added with ID:', projectRef.id);
+      toggleProjectModal();
+    } catch (error) {
+      console.error('Error adding project:', error);
+    }
   };
 
   if (loading) {
@@ -92,10 +110,10 @@ const Projects: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-800">Projects</h1>
           <p className="text-secondary-500 mt-1">Manage all engineering projects</p>
         </div>
-        <Link to="/projects/new" className="btn-primary">
+        <button onClick={toggleProjectModal} className="btn-primary">
           <PlusIcon className="w-5 h-5 mr-2" />
           New Project
-        </Link>
+        </button>
       </div>
 
       {/* Filters */}
@@ -149,11 +167,11 @@ const Projects: React.FC = () => {
             <Link key={project.id} to={`/projects/${project.id}`}>
               <motion.div
                 whileHover={{ y: -4 }}
-                className="card p-6 h-full cursor-pointer"
+                className="project-card"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <span className={`badge ${statusColors[project.status]}`}>
-                    {project.status.replace('_', ' ')}
+                  <span className={`badge ${statusColors[project.status] || statusColors.not_started}`}>
+                    {(project.status || 'not_started').replace('_', ' ')}
                   </span>
                   <div className="text-right">
                     <p className="text-sm text-secondary-500">Progress</p>
@@ -171,8 +189,8 @@ const Projects: React.FC = () => {
                 {/* Progress bar */}
                 <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-4">
                   <div
-                    className="h-full bg-primary-500 rounded-full transition-all duration-500"
-                    style={{ width: `${project.progress || 0}%` }}
+                    className="progress-bar"
+                    data-progress-width={`${project.progress || 0}%`}
                   />
                 </div>
 
@@ -203,6 +221,15 @@ const Projects: React.FC = () => {
             </Link>
           ))}
         </div>
+      )}
+
+      {/* Project Modal */}
+      {isProjectModalOpen && (
+        <ProjectModal
+          isOpen={isProjectModalOpen}
+          onClose={toggleProjectModal}
+          onSubmit={handleProjectSubmit}
+        />
       )}
     </motion.div>
   );

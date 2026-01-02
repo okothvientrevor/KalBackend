@@ -346,3 +346,20 @@ body {
 .empty-state-description {
   @apply text-secondary-500 max-w-sm;
 }
+
+/* Added styles for Projects page */
+.project-card {
+  /* Move inline styles here */
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Added styles for Dashboard progress bar */
+.dashboard-progress-bar {
+  height: 100%;
+  background-color: #3b82f6; /* Tailwind primary-500 */
+  border-radius: 9999px; /* Full rounded */
+  transition: width 0.5s;
+}

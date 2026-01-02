@@ -5,7 +5,7 @@ import {
   MagnifyingGlassIcon,
   ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline';
-import { collection, query, getDocs, orderBy, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Task, TaskStatus, TaskPriority } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,43 +25,32 @@ const Tasks: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('grid');
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const fetchTasks = async () => {
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Tasks fetch timeout')), 5000);
-      });
-      const tasksQuery = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
-      const promise = getDocs(tasksQuery);
-      const snapshot = await Promise.race([promise, timeoutPromise]);
-      const tasksData = snapshot.docs.map((doc) => ({
+    const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const taskData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
         dueDate: doc.data().dueDate?.toDate() || new Date(),
         createdAt: doc.data().createdAt?.toDate() || new Date(),
         updatedAt: doc.data().updatedAt?.toDate() || new Date(),
       })) as Task[];
-      setTasks(tasksData);
-    } catch (error) {
-      // Handle timeout silently - don't log timeout errors
-      if (!(error instanceof Error) || !error.message.includes('timeout')) {
-        console.error('Error fetching tasks:', error);
-      }
-      toast.error('Failed to load tasks');
-      setTasks([]);
-    } finally {
+      setTasks(taskData);
       setLoading(false);
-    }
-  };
+    }, (error) => {
+      console.error('Error fetching tasks:', error);
+      toast.error('Failed to load tasks');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleCreateTask = async (taskData: Partial<Task>) => {
     try {
       const newTask = {
         ...taskData,
         creatorId: currentUser?.uid,
-        creatorName: userProfile?.displayName,
+        creatorName: userProfile?.displayName || 'Unknown User', // Added fallback
         status: 'todo' as TaskStatus,
         attachments: [],
         comments: [],
@@ -70,7 +59,6 @@ const Tasks: React.FC = () => {
       };
       await addDoc(collection(db, 'tasks'), newTask);
       toast.success('Task created successfully');
-      fetchTasks();
       setIsModalOpen(false);
     } catch (error) {
       console.error('Error creating task:', error);
@@ -85,7 +73,6 @@ const Tasks: React.FC = () => {
         updatedAt: serverTimestamp(),
       });
       toast.success('Task updated successfully');
-      fetchTasks();
       setEditingTask(null);
       setIsModalOpen(false);
     } catch (error) {
@@ -99,7 +86,6 @@ const Tasks: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'tasks', taskId));
       toast.success('Task deleted successfully');
-      fetchTasks();
     } catch (error) {
       console.error('Error deleting task:', error);
       toast.error('Failed to delete task');
