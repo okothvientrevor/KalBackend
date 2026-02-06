@@ -22,7 +22,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { Menu, Transition, Tab } from '@headlessui/react';
 import { useAuth } from '../contexts/AuthContext';
-import { doc, getDoc, updateDoc, addDoc, collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { 
@@ -33,7 +33,28 @@ import {
   NextAction,
   Attachment,
 } from '../types';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isValid } from 'date-fns';
+
+// Safe date formatting helpers
+const formatDate = (date: any, formatStr: string, fallback: string = 'N/A'): string => {
+  if (!date) return fallback;
+  try {
+    const dateObj = date instanceof Date ? date : (date?.toDate ? date.toDate() : new Date(date));
+    return isValid(dateObj) ? format(dateObj, formatStr) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const safeFormatDistanceToNow = (date: any, fallback: string = 'recently'): string => {
+  if (!date) return fallback;
+  try {
+    const dateObj = date instanceof Date ? date : (date?.toDate ? date.toDate() : new Date(date));
+    return isValid(dateObj) ? formatDistanceToNow(dateObj) : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 const TaskDetail: React.FC = () => {
   const { taskId } = useParams<{ taskId: string }>();
@@ -79,8 +100,7 @@ const TaskDetail: React.FC = () => {
     // Listen for updates
     const updatesQuery = query(
       collection(db, 'taskUpdates'),
-      where('taskId', '==', taskId),
-      orderBy('createdAt', 'desc')
+      where('taskId', '==', taskId)
     );
 
     const unsubscribeUpdates = onSnapshot(updatesQuery, (snapshot) => {
@@ -90,14 +110,19 @@ const TaskDetail: React.FC = () => {
         createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
         updatedAt: doc.data().updatedAt?.toDate?.() || doc.data().updatedAt,
       })) as Update[];
+      // Sort in memory to avoid Firestore composite index requirement
+      updatesData.sort((a, b) => {
+        const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+        const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+        return (dateB || 0) - (dateA || 0);
+      });
       setUpdates(updatesData);
     });
 
     // Listen for next actions
     const actionsQuery = query(
       collection(db, 'nextActions'),
-      where('taskId', '==', taskId),
-      orderBy('createdAt', 'desc')
+      where('taskId', '==', taskId)
     );
 
     const unsubscribeActions = onSnapshot(actionsQuery, (snapshot) => {
@@ -108,6 +133,12 @@ const TaskDetail: React.FC = () => {
         createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
         completedAt: doc.data().completedAt?.toDate?.() || doc.data().completedAt,
       })) as NextAction[];
+      // Sort in memory to avoid Firestore composite index requirement
+      actionsData.sort((a, b) => {
+        const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt as any).getTime();
+        const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt as any).getTime();
+        return (dateB || 0) - (dateA || 0);
+      });
       setNextActions(actionsData);
     });
 
@@ -438,7 +469,7 @@ const TaskDetail: React.FC = () => {
             <div>
               <h3 className="font-semibold text-secondary-800">Due Date</h3>
               <p className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-secondary-600'}`}>
-                {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                {formatDate(task.dueDate, 'MMM d, yyyy')}
                 {isOverdue && ' (Overdue)'}
               </p>
             </div>
@@ -551,7 +582,7 @@ const TaskDetail: React.FC = () => {
                           </span>
                           {subtask.completedAt && (
                             <span className="text-xs text-secondary-400">
-                              Completed {formatDistanceToNow(new Date(subtask.completedAt))} ago
+                              Completed {safeFormatDistanceToNow(subtask.completedAt)} ago
                             </span>
                           )}
                         </div>
@@ -571,16 +602,16 @@ const TaskDetail: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-secondary-500">Created:</span>
-                        <span className="text-secondary-700">{format(new Date(task.createdAt), 'MMM d, yyyy')}</span>
+                        <span className="text-secondary-700">{formatDate(task.createdAt, 'MMM d, yyyy')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-secondary-500">Last updated:</span>
-                        <span className="text-secondary-700">{format(new Date(task.updatedAt), 'MMM d, yyyy')}</span>
+                        <span className="text-secondary-700">{formatDate(task.updatedAt, 'MMM d, yyyy')}</span>
                       </div>
                       {task.completedDate && (
                         <div className="flex justify-between">
                           <span className="text-secondary-500">Completed:</span>
-                          <span className="text-secondary-700">{format(new Date(task.completedDate), 'MMM d, yyyy')}</span>
+                          <span className="text-secondary-700">{formatDate(task.completedDate, 'MMM d, yyyy')}</span>
                         </div>
                       )}
                     </div>
@@ -682,7 +713,7 @@ const TaskDetail: React.FC = () => {
                             </div>
                             <span className="font-medium text-secondary-800">{update.authorName}</span>
                             <span className="text-sm text-secondary-500">
-                              {formatDistanceToNow(new Date(update.createdAt))} ago
+                              {safeFormatDistanceToNow(update.createdAt)} ago
                             </span>
                           </div>
                           <h4 className="font-semibold text-secondary-800 mb-2">{update.title}</h4>
@@ -760,7 +791,7 @@ const TaskDetail: React.FC = () => {
                           <div>
                             <h4 className="font-medium text-secondary-800">{attachment.name}</h4>
                             <p className="text-sm text-secondary-500">
-                              Uploaded by {attachment.uploadedByName} on {format(new Date(attachment.uploadedAt), 'MMM d, yyyy')}
+                              Uploaded by {attachment.uploadedByName} on {formatDate(attachment.uploadedAt, 'MMM d, yyyy')}
                             </p>
                           </div>
                         </div>
@@ -852,9 +883,9 @@ const TaskDetail: React.FC = () => {
                               </p>
                             )}
                             <div className="flex items-center gap-4 mt-2 text-xs text-secondary-500">
-                              <span>Created {formatDistanceToNow(new Date(action.createdAt))} ago</span>
+                              <span>Created {safeFormatDistanceToNow(action.createdAt)} ago</span>
                               {action.isCompleted && action.completedAt && (
-                                <span>Completed {formatDistanceToNow(new Date(action.completedAt))} ago</span>
+                                <span>Completed {safeFormatDistanceToNow(action.completedAt)} ago</span>
                               )}
                             </div>
                           </div>

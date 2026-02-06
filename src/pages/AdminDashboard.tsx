@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { ApprovalRequest, Task, User, AuditLog } from '../types';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isValid } from 'date-fns';
 
 const AdminDashboard: React.FC = () => {
   const { userProfile } = useAuth();
@@ -53,10 +53,18 @@ const AdminDashboard: React.FC = () => {
         limit(10)
       );
       const completedTasksSnapshot = await getDocs(completedTasksQuery);
-      const completedTasks = completedTasksSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Task[];
+      const completedTasks = completedTasksSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          dueDate: data.dueDate?.toDate?.() || data.dueDate || new Date(),
+          startDate: data.startDate?.toDate?.() || data.startDate,
+          completedDate: data.completedDate?.toDate?.() || data.completedDate,
+          createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+          updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
+        };
+      }) as Task[];
 
       // Fetch pending approvals
       const approvalsQuery = query(
@@ -221,7 +229,7 @@ const AdminDashboard: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-secondary-800 truncate">{approval.entityName}</p>
                     <p className="text-sm text-secondary-500">
-                      {approval.entityType} • Requested {formatDistanceToNow(new Date(approval.requestedAt))} ago
+                      {approval.entityType} • Requested {approval.requestedAt && isValid(new Date(approval.requestedAt)) ? formatDistanceToNow(new Date(approval.requestedAt)) : 'recently'} ago
                     </p>
                   </div>
                   <Link
@@ -259,7 +267,7 @@ const AdminDashboard: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-secondary-800 truncate">{task.title}</p>
                     <p className="text-sm text-secondary-500">
-                      By {task.assigneeName} • {task.completedDate ? format(new Date(task.completedDate), 'MMM d') : 'Recently'}
+                      By {task.assigneeName || 'Unknown'} • {task.completedDate && isValid(new Date(task.completedDate)) ? format(new Date(task.completedDate), 'MMM d') : 'Recently'}
                     </p>
                   </div>
                   <Link
@@ -301,7 +309,7 @@ const AdminDashboard: React.FC = () => {
                     {log.entityName && ` "${log.entityName}"`}
                   </p>
                   <p className="text-xs text-secondary-400">
-                    {formatDistanceToNow(new Date(log.timestamp))} ago
+                    {log.timestamp && isValid(new Date(log.timestamp)) ? formatDistanceToNow(new Date(log.timestamp)) : 'recently'} ago
                   </p>
                 </div>
               </div>

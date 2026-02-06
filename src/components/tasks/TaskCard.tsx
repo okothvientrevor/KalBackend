@@ -11,7 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Menu, Transition } from '@headlessui/react';
 import { Task, TaskStatus, TaskPriority } from '../../types';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 interface TaskCardProps {
   task: Task;
@@ -34,6 +34,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onStatusCha
     in_progress: 'In Progress',
     completed: 'Completed',
     verified: 'Verified',
+    pending_approval: 'Pending Approval',
   };
 
   const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'completed' && task.status !== 'verified';
@@ -56,7 +57,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onStatusCha
           <span className={`badge ${priorityColors[task.priority]}`}>{task.priority}</span>
           <div className="flex items-center gap-1 text-sm text-secondary-500">
             <CalendarIcon className="w-4 h-4" />
-            {format(new Date(task.dueDate), 'MMM d')}
+            {(() => { try { const d = new Date(task.dueDate); return isValid(d) ? format(d, 'MMM d') : 'N/A'; } catch { return 'N/A'; } })()}
           </div>
           <div className="flex items-center gap-1 text-sm text-secondary-500">
             <UserIcon className="w-4 h-4" />
@@ -187,7 +188,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onEdit, onDelete, onStatusCha
         </div>
         <div className={`flex items-center gap-1 text-sm ${isOverdue ? 'text-red-600' : 'text-secondary-500'}`}>
           <CalendarIcon className="w-4 h-4" />
-          {format(new Date(task.dueDate), 'MMM d')}
+          {(() => { try { const d = new Date(task.dueDate); return isValid(d) ? format(d, 'MMM d') : 'N/A'; } catch { return 'N/A'; } })()}
         </div>
       </div>
 

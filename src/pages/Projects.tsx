@@ -14,7 +14,7 @@ import { db } from '../config/firebase';
 import { Project, ProjectStatus } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import ProjectModal from '../components/projects/ProjectModal';
 
 const Projects: React.FC = () => {
@@ -70,6 +70,7 @@ const Projects: React.FC = () => {
     delayed: 'bg-red-100 text-red-700',
     completed: 'bg-green-100 text-green-700',
     cancelled: 'bg-gray-300 text-gray-700',
+    pending_approval: 'bg-orange-100 text-orange-700',
   };
 
   const toggleProjectModal = () => {
@@ -197,7 +198,14 @@ const Projects: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center gap-2 text-secondary-600">
                     <CalendarIcon className="w-4 h-4" />
-                    {format(new Date(project.endDate), 'MMM d, yyyy')}
+                    {(() => {
+                      try {
+                        const d = new Date(project.endDate);
+                        return isValid(d) ? format(d, 'MMM d, yyyy') : 'N/A';
+                      } catch {
+                        return 'N/A';
+                      }
+                    })()}
                   </div>
                   <div className="flex items-center gap-2 text-secondary-600">
                     <CurrencyDollarIcon className="w-4 h-4" />

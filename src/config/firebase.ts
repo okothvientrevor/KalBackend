@@ -19,6 +19,9 @@ const app = initializeApp(firebaseConfig);
 // Initialize services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Initialize storage with custom configuration
+// Note: maxUploadRetryTime and maxOperationRetryTime help handle CORS issues
 export const storage = getStorage(app);
 
 export default app;

@@ -100,14 +100,20 @@ const AuditLogs = () => {
   };
 
   const formatTimestamp = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }).format(new Date(date));
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return 'N/A';
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }).format(d);
+    } catch {
+      return 'N/A';
+    }
   };
 
   const exportLogs = () => {

@@ -5,7 +5,7 @@ import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Expenditure, ExpenditureStatus, ExpenditureCategory } from '../types';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 const Expenditures: React.FC = () => {
   const [expenditures, setExpenditures] = useState<Expenditure[]>([]);
@@ -140,7 +140,7 @@ const Expenditures: React.FC = () => {
                       <td><span className="badge badge-secondary">{categoryLabels[exp.category]}</span></td>
                       <td className="text-secondary-600">{exp.projectName || '-'}</td>
                       <td className="text-secondary-600">{exp.requestedByName}</td>
-                      <td className="text-secondary-500">{format(new Date(exp.requestedAt), 'MMM d, yyyy')}</td>
+                      <td className="text-secondary-500">{(() => { try { const d = new Date(exp.requestedAt); return isValid(d) ? format(d, 'MMM d, yyyy') : 'N/A'; } catch { return 'N/A'; } })()}</td>
                       <td>
                         <span className={`badge ${statusStyle.bg} ${statusStyle.text} flex items-center gap-1 w-fit`}>
                           <StatusIcon className="w-3.5 h-3.5" />

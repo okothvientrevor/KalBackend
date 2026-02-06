@@ -22,7 +22,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { Menu, Transition, Tab } from '@headlessui/react';
 import { useAuth } from '../contexts/AuthContext';
-import { doc, getDoc, updateDoc, addDoc, collection, query, where, orderBy, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import {
@@ -33,7 +33,7 @@ import {
   TaskPriority,
   Task,
 } from '../types';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isValid } from 'date-fns';
 
 const ProjectDetail: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -82,64 +82,111 @@ const ProjectDetail: React.FC = () => {
 
     const fetchTasks = async () => {
       try {
+        // Simplified query - fetch all tasks for this project
+        // orderBy removed to avoid index requirement
         const tasksQuery = query(
           collection(db, 'tasks'),
-          where('projectId', '==', projectId),
-          orderBy('createdAt', 'desc')
+          where('projectId', '==', projectId)
         );
         const tasksSnapshot = await getDocs(tasksQuery);
-        const tasksData = tasksSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          dueDate: doc.data().dueDate?.toDate?.() || doc.data().dueDate,
-          startDate: doc.data().startDate?.toDate?.() || doc.data().startDate,
-          completedDate: doc.data().completedDate?.toDate?.() || doc.data().completedDate,
-          createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-          updatedAt: doc.data().updatedAt?.toDate?.() || doc.data().updatedAt,
-        })) as Task[];
+        const tasksData = tasksSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            dueDate: data.dueDate?.toDate?.() || data.dueDate || new Date(),
+            startDate: data.startDate?.toDate?.() || data.startDate,
+            completedDate: data.completedDate?.toDate?.() || data.completedDate,
+            createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+            updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
+          };
+        }) as Task[];
+        
+        // Sort in memory instead of in query
+        tasksData.sort((a, b) => {
+          const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+          const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
         setTasks(tasksData);
       } catch (error) {
         console.error('Error fetching tasks:', error);
+        setTasks([]);
       }
     };
 
     fetchProject();
     fetchTasks();
 
-    // Listen for updates
+    // Listen for updates - simplified query without orderBy to avoid index requirement
     const updatesQuery = query(
       collection(db, 'projectUpdates'),
-      where('projectId', '==', projectId),
-      orderBy('createdAt', 'desc')
+      where('projectId', '==', projectId)
     );
 
-    const unsubscribeUpdates = onSnapshot(updatesQuery, (snapshot) => {
-      const updatesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate?.() || doc.data().updatedAt,
-      })) as Update[];
-      setUpdates(updatesData);
-    });
+    const unsubscribeUpdates = onSnapshot(
+      updatesQuery,
+      (snapshot) => {
+        const updatesData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+            updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
+          };
+        }) as Update[];
+        
+        // Sort in memory
+        updatesData.sort((a, b) => {
+          const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+          const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
+        setUpdates(updatesData);
+      },
+      (error) => {
+        console.error('Error listening to updates:', error);
+        setUpdates([]);
+      }
+    );
 
-    // Listen for next actions
+    // Listen for next actions - simplified query without orderBy
     const actionsQuery = query(
       collection(db, 'nextActions'),
-      where('projectId', '==', projectId),
-      orderBy('createdAt', 'desc')
+      where('projectId', '==', projectId)
     );
 
-    const unsubscribeActions = onSnapshot(actionsQuery, (snapshot) => {
-      const actionsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        dueDate: doc.data().dueDate?.toDate?.() || doc.data().dueDate,
-        createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-        completedAt: doc.data().completedAt?.toDate?.() || doc.data().completedAt,
-      })) as NextAction[];
-      setNextActions(actionsData);
-    });
+    const unsubscribeActions = onSnapshot(
+      actionsQuery,
+      (snapshot) => {
+        const actionsData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            dueDate: data.dueDate?.toDate?.() || data.dueDate,
+            createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+            completedAt: data.completedAt?.toDate?.() || data.completedAt,
+          };
+        }) as NextAction[];
+        
+        // Sort in memory
+        actionsData.sort((a, b) => {
+          const dateA = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+          const dateB = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
+        setNextActions(actionsData);
+      },
+      (error) => {
+        console.error('Error listening to actions:', error);
+        setNextActions([]);
+      }
+    );
 
     return () => {
       unsubscribeUpdates();
@@ -312,6 +359,28 @@ const ProjectDetail: React.FC = () => {
     return colors[status] || 'text-gray-700 bg-gray-100';
   };
 
+  // Helper function to safely format dates
+  const formatDate = (date: any, formatStr: string, fallback: string = 'N/A'): string => {
+    if (!date) return fallback;
+    try {
+      const dateObj = date instanceof Date ? date : (date?.toDate ? date.toDate() : new Date(date));
+      return isValid(dateObj) ? format(dateObj, formatStr) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  // Helper function to safely format distance to now
+  const safeFormatDistanceToNow = (date: any, fallback: string = 'recently'): string => {
+    if (!date) return fallback;
+    try {
+      const dateObj = date instanceof Date ? date : (date?.toDate ? date.toDate() : new Date(date));
+      return isValid(dateObj) ? formatDistanceToNow(dateObj) : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   const getPriorityColor = (priority: TaskPriority) => {
     const colors = {
       low: 'text-green-700 bg-green-100',
@@ -380,7 +449,14 @@ const ProjectDetail: React.FC = () => {
     );
   }
 
-  const isOverdue = new Date(project.endDate) < new Date() && project.status !== 'completed' && project.status !== 'cancelled';
+  const isOverdue = (() => {
+    try {
+      const endDate = project.endDate instanceof Date ? project.endDate : (project.endDate as any)?.toDate?.() || new Date(project.endDate as any);
+      return isValid(endDate) && endDate < new Date() && project.status !== 'completed' && project.status !== 'cancelled';
+    } catch {
+      return false;
+    }
+  })();
   const progress = calculateProgress();
 
   const tabs = [
@@ -516,13 +592,13 @@ const ProjectDetail: React.FC = () => {
             <div>
               <h3 className="font-semibold text-secondary-800">Timeline</h3>
               <p className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-secondary-600'}`}>
-                Due {format(new Date(project.endDate), 'MMM d, yyyy')}
+                Due {formatDate(project.endDate, 'MMM d, yyyy')}
                 {isOverdue && ' (Overdue)'}
               </p>
             </div>
           </div>
           <div className="text-xs text-secondary-500">
-            Started: {format(new Date(project.startDate), 'MMM d, yyyy')}
+            Started: {formatDate(project.startDate, 'MMM d, yyyy')}
           </div>
         </div>
 
@@ -609,11 +685,11 @@ const ProjectDetail: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-secondary-500">Created:</span>
-                        <span className="text-secondary-700">{format(new Date(project.createdAt), 'MMM d, yyyy')}</span>
+                        <span className="text-secondary-700">{formatDate(project.createdAt, 'MMM d, yyyy')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-secondary-500">Last updated:</span>
-                        <span className="text-secondary-700">{format(new Date(project.updatedAt), 'MMM d, yyyy')}</span>
+                        <span className="text-secondary-700">{formatDate(project.updatedAt, 'MMM d, yyyy')}</span>
                       </div>
                     </div>
                   </div>
@@ -661,9 +737,9 @@ const ProjectDetail: React.FC = () => {
                               <p className="text-sm text-secondary-600 mt-1">{milestone.description}</p>
                             )}
                             <div className="flex items-center gap-4 mt-2 text-xs text-secondary-500">
-                              <span>Due: {format(new Date(milestone.dueDate), 'MMM d, yyyy')}</span>
+                              <span>Due: {formatDate(milestone.dueDate, 'MMM d, yyyy')}</span>
                               {milestone.completedDate && (
-                                <span>Completed: {format(new Date(milestone.completedDate), 'MMM d, yyyy')}</span>
+                                <span>Completed: {formatDate(milestone.completedDate, 'MMM d, yyyy')}</span>
                               )}
                             </div>
                           </div>
@@ -687,7 +763,7 @@ const ProjectDetail: React.FC = () => {
                             <h5 className="font-medium text-secondary-800">{member.userName}</h5>
                             <p className="text-sm text-secondary-500">{member.role}</p>
                             <p className="text-xs text-secondary-400">
-                              Added {format(new Date(member.assignedAt), 'MMM d, yyyy')}
+                              Added {formatDate(member.assignedAt, 'MMM d, yyyy')}
                             </p>
                           </div>
                         </div>
@@ -727,7 +803,7 @@ const ProjectDetail: React.FC = () => {
                               {task.priority}
                             </span>
                             <span className="text-xs text-secondary-500">
-                              Due: {format(new Date(task.dueDate), 'MMM d')}
+                              Due: {formatDate(task.dueDate, 'MMM d')}
                             </span>
                             <span className="text-xs text-secondary-500">
                               Assigned to: {task.assigneeName}
@@ -836,7 +912,7 @@ const ProjectDetail: React.FC = () => {
                             </div>
                             <span className="font-medium text-secondary-800">{update.authorName}</span>
                             <span className="text-sm text-secondary-500">
-                              {formatDistanceToNow(new Date(update.createdAt))} ago
+                              {safeFormatDistanceToNow(update.createdAt)} ago
                             </span>
                           </div>
                           <h4 className="font-semibold text-secondary-800 mb-2">{update.title}</h4>
@@ -914,7 +990,7 @@ const ProjectDetail: React.FC = () => {
                           <div>
                             <h4 className="font-medium text-secondary-800">{attachment.name}</h4>
                             <p className="text-sm text-secondary-500">
-                              Uploaded by {attachment.uploadedByName} on {format(new Date(attachment.uploadedAt), 'MMM d, yyyy')}
+                              Uploaded by {attachment.uploadedByName} on {formatDate(attachment.uploadedAt, 'MMM d, yyyy')}
                             </p>
                           </div>
                         </div>
@@ -1006,9 +1082,9 @@ const ProjectDetail: React.FC = () => {
                               </p>
                             )}
                             <div className="flex items-center gap-4 mt-2 text-xs text-secondary-500">
-                              <span>Created {formatDistanceToNow(new Date(action.createdAt))} ago</span>
+                              <span>Created {safeFormatDistanceToNow(action.createdAt)} ago</span>
                               {action.isCompleted && action.completedAt && (
-                                <span>Completed {formatDistanceToNow(new Date(action.completedAt))} ago</span>
+                                <span>Completed {safeFormatDistanceToNow(action.completedAt)} ago</span>
                               )}
                             </div>
                           </div>
