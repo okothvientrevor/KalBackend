@@ -13,11 +13,13 @@ import {
   CheckIcon,
   EllipsisVerticalIcon,
   UserGroupIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import { collection, query, orderBy, onSnapshot, updateDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { User } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import CreateUserModal from '../components/admin/CreateUserModal';
 
 const AdminUsers = () => {
   const { userProfile } = useAuth();
@@ -27,6 +29,7 @@ const AdminUsers = () => {
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showMenu, setShowMenu] = useState<string | null>(null);
 
@@ -173,6 +176,13 @@ const AdminUsers = () => {
           <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
           <p className="text-gray-600">Manage users and their roles</p>
         </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="btn-primary"
+        >
+          <PlusIcon className="w-5 h-5 mr-2" />
+          Create User
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -598,6 +608,16 @@ const AdminUsers = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Create User Modal */}
+      <CreateUserModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          // Refresh will happen automatically via onSnapshot listener
+          console.log('User created successfully');
+        }}
+      />
     </div>
   );
 };

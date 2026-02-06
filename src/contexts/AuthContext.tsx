@@ -53,25 +53,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await Promise.race([userDocPromise, timeoutPromise]);
           if (userDoc.exists()) {
             const userData = userDoc.data() as User;
-            setUserProfile({
+            const userProfileData = {
               ...userData,
               id: user.uid,
-              createdAt: userData.createdAt?.toDate?.() || new Date(),
-              updatedAt: userData.updatedAt?.toDate?.() || new Date(),
-            } as User);
+              email: userData.email || user.email, // Fallback to Firebase Auth email
+              displayName: userData.displayName || user.displayName, // Fallback to Firebase Auth displayName
+              createdAt: userData.createdAt?.toDate?.() || userData.createdAt || new Date(),
+              updatedAt: userData.updatedAt?.toDate?.() || userData.updatedAt || new Date(),
+            } as User;
+            setUserProfile(userProfileData);
+            console.log('User profile loaded:', userProfileData); // Debug log
             // Update last login (non-blocking)
             updateDoc(doc(db, 'users', user.uid), {
               lastLogin: serverTimestamp(),
             }).catch((error) => console.error('Error updating last login:', error));
           } else {
-            setUserProfile(null);
+            console.log('User profile document not found, creating one...'); // Debug log
+            // Create a basic profile document if it doesn't exist
+            const basicProfile: Omit<User, 'id'> = {
+              email: user.email || '',
+              displayName: user.displayName || user.email?.split('@')[0] || 'User',
+              role: 'technical_team' as UserRole, // Default role
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            await setDoc(doc(db, 'users', user.uid), {
+              ...basicProfile,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+            setUserProfile({
+              ...basicProfile,
+              id: user.uid,
+            } as User);
           }
         } catch (error) {
           // Handle timeout silently - don't log timeout errors
           if (!(error instanceof Error) || !error.message.includes('timeout')) {
             console.error('Error fetching user profile:', error);
           }
-          setUserProfile(null); // Set to null if fetch fails or times out
+          console.log('Creating fallback profile from Firebase Auth data...'); // Debug log
+          // Create fallback profile from Firebase Auth data
+          const fallbackProfile: User = {
+            id: user.uid,
+            email: user.email || '',
+            displayName: user.displayName || user.email?.split('@')[0] || 'User',
+            role: 'technical_team' as UserRole,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          setUserProfile(fallbackProfile);
         }
       } else {
         setUserProfile(null);
@@ -127,13 +160,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await updateProfile(currentUser, { displayName: data.displayName });
     }
     
-    // Refresh user profile
-    const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-    if (userDoc.exists()) {
-      setUserProfile({
-        ...userDoc.data(),
-        id: currentUser.uid,
-      } as User);
+    // Refresh user profile with proper timestamp handling
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Firebase timeout')), 5000);
+      });
+      const userDocPromise = getDoc(doc(db, 'users', currentUser.uid));
+      const userDoc = await Promise.race([userDocPromise, timeoutPromise]);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as User;
+        const updatedProfile = {
+          ...userData,
+          id: currentUser.uid,
+          email: userData.email || currentUser.email,
+          displayName: userData.displayName || currentUser.displayName,
+          createdAt: userData.createdAt?.toDate?.() || userData.createdAt || new Date(),
+          updatedAt: userData.updatedAt?.toDate?.() || userData.updatedAt || new Date(),
+        } as User;
+        setUserProfile(updatedProfile);
+        console.log('Profile updated and refreshed:', updatedProfile);
+      }
+    } catch (error) {
+      // If refresh fails, update the existing profile with new data
+      if (userProfile) {
+        const updatedProfile = {
+          ...userProfile,
+          ...data,
+          updatedAt: new Date(),
+        } as User;
+        setUserProfile(updatedProfile);
+        console.log('Profile updated locally:', updatedProfile);
+      }
+      console.error('Error refreshing profile after update:', error);
     }
   };
 

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types';
 import toast from 'react-hot-toast';
+import { checkAdminExists } from '../../utils/adminSetup';
 
 const Register: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
@@ -12,14 +13,43 @@ const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('technical_team');
   const [loading, setLoading] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [allowAdminSignup, setAllowAdminSignup] = useState(false);
   const navigate = useNavigate();
   const { signUp } = useAuth();
 
-  const roles: { value: UserRole; label: string }[] = [
-    { value: 'technical_team', label: 'Technical Team Member' },
-    { value: 'project_manager', label: 'Project Manager' },
-    { value: 'finance_officer', label: 'Finance Officer' },
-    { value: 'auditor', label: 'Auditor' },
+  // Check if admin exists on component mount
+  useEffect(() => {
+    const checkAdmin = async () => {
+      console.log('🚀 Register component: Starting admin check...');
+      try {
+        const adminExists = await checkAdminExists();
+        console.log(`📋 Register component: Admin exists = ${adminExists}`);
+        const allowSignup = !adminExists;
+        console.log(`🔓 Register component: Allow admin signup = ${allowSignup}`);
+        setAllowAdminSignup(allowSignup);
+      } catch (error) {
+        console.error('❌ Register component: Error checking admin status:', error);
+        setAllowAdminSignup(false);
+      } finally {
+        setCheckingAdmin(false);
+        console.log('✅ Register component: Admin check complete');
+      }
+    };
+    
+    checkAdmin();
+  }, []);
+
+  const roles: { value: UserRole; label: string; description?: string }[] = [
+    { value: 'technical_team', label: 'Technical Team Member', description: 'For engineers and technical staff' },
+    { value: 'project_manager', label: 'Project Manager', description: 'Manage projects and teams' },
+    { value: 'finance_officer', label: 'Finance Officer', description: 'Handle financial operations' },
+    { value: 'auditor', label: 'Auditor', description: 'Review and audit activities' },
+    { 
+      value: 'admin' as UserRole, 
+      label: 'Administrator', 
+      description: 'Full system access' 
+    },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,10 +70,34 @@ const Register: React.FC = () => {
       return;
     }
 
+    // Additional warning for admin sign-up
+    if (role === 'admin' && allowAdminSignup) {
+      const confirmed = window.confirm(
+        '⚠️ You are creating the initial administrator account.\n\n' +
+        'This account will have full system access. Please ensure you:\n' +
+        '• Use a strong password\n' +
+        '• Keep these credentials secure\n' +
+        '• Remember that this option will be disabled after the first admin is created\n\n' +
+        'Do you want to continue?'
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       await signUp(email, password, displayName, role);
-      toast.success('Account created successfully!');
+      
+      // Log admin creation if this is an admin account
+      if (role === 'admin') {
+        toast.success('Administrator account created successfully! Welcome to KAL Engineering.');
+        console.log('Initial admin account created:', email);
+      } else {
+        toast.success('Account created successfully!');
+      }
+      
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -60,6 +114,18 @@ const Register: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Show loading state while checking for admin
+  if (checkingAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+          <p className="text-secondary-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -156,6 +222,31 @@ const Register: React.FC = () => {
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-secondary-800">Create Account</h2>
               <p className="text-secondary-500 mt-2">Sign up to get started</p>
+              
+              {/* Debug Info - Remove in production */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-left">
+                <p className="text-xs font-mono text-blue-800">
+                  <strong>Debug Info:</strong><br />
+                  allowAdminSignup: {String(allowAdminSignup)}<br />
+                  checkingAdmin: {String(checkingAdmin)}
+                </p>
+              </div>
+              
+              {allowAdminSignup && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-amber-800">⚠️ Initial Setup Mode</p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        No admin account exists. You can create the first administrator account.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -203,6 +294,16 @@ const Register: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                {roles.find(r => r.value === role)?.description && (
+                  <p className="mt-1.5 text-xs text-secondary-500">
+                    {roles.find(r => r.value === role)?.description}
+                  </p>
+                )}
+                {role === 'admin' && allowAdminSignup && (
+                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                    ⚠️ Administrator accounts have full system access. This option will be disabled after creation.
+                  </div>
+                )}
               </div>
 
               <div>

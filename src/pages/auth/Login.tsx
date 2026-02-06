@@ -209,7 +209,7 @@ const Login: React.FC = () => {
             className="mt-6 p-4 bg-primary-50 rounded-xl border border-primary-100"
           >
             <p className="text-sm text-primary-700 text-center">
-              <strong>Demo:</strong> Create an account or contact admin for credentials
+              <strong>First Time Setup?</strong> Create an admin account to get started
             </p>
           </motion.div>
         </div>

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   UserCircleIcon,
@@ -19,21 +19,45 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 
 const Profile = () => {
-  const { user, userProfile, updateProfile } = useAuth();
+  const { user, userProfile, currentUser, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
-    displayName: userProfile?.displayName || '',
-    email: userProfile?.email || '',
+    displayName: userProfile?.displayName || currentUser?.displayName || '',
+    email: userProfile?.email || currentUser?.email || '',
     phone: userProfile?.phone || '',
     department: userProfile?.department || '',
     position: userProfile?.position || '',
     location: userProfile?.location || '',
     bio: userProfile?.bio || '',
   });
+
+  // Update form data when userProfile or currentUser changes
+  useEffect(() => {
+    const newFormData = {
+      displayName: userProfile?.displayName || currentUser?.displayName || '',
+      email: userProfile?.email || currentUser?.email || '',
+      phone: userProfile?.phone || '',
+      department: userProfile?.department || '',
+      position: userProfile?.position || '',
+      location: userProfile?.location || '',
+      bio: userProfile?.bio || '',
+    };
+    
+    // Only update if data has actually changed to prevent unnecessary re-renders
+    const hasChanges = Object.keys(newFormData).some(key => {
+      return formData[key as keyof typeof formData] !== newFormData[key as keyof typeof newFormData];
+    });
+    
+    if (hasChanges) {
+      console.log('Updating form data due to profile changes:', newFormData);
+      setFormData(newFormData);
+    }
+  }, [userProfile, currentUser]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,11 +90,25 @@ const Profile = () => {
 
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      const updatedData = {
         ...formData,
         updatedAt: Timestamp.now(),
-      });
+      };
+      
+      // Update Firestore
+      await updateDoc(doc(db, 'users', user.uid), updatedData);
+      
+      // Update local profile context - this will refresh the profile from Firestore
+      if (updateProfile) {
+        await updateProfile(formData);
+      }
+      
       setIsEditing(false);
+      setShowSuccess(true);
+      console.log('Profile updated successfully'); // Success feedback
+      
+      // Hide success message after 3 seconds
+      setTimeout(() => setShowSuccess(false), 3000);
     } catch (error) {
       console.error('Error updating profile:', error);
     } finally {
@@ -154,7 +192,7 @@ const Profile = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                {userProfile?.displayName || 'User'}
+                {userProfile?.displayName || currentUser?.displayName || userProfile?.email?.split('@')[0] || currentUser?.email?.split('@')[0] || 'User'}
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${getRoleBadgeColor(userProfile?.role)}`}>
@@ -180,6 +218,21 @@ const Profile = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* Success Message */}
+      {showSuccess && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="card p-4 bg-green-50 border-green-200"
+        >
+          <div className="flex items-center gap-2 text-green-800">
+            <CheckIcon className="w-5 h-5" />
+            <span className="font-medium">Profile updated successfully!</span>
+          </div>
+        </motion.div>
+      )}
 
       {/* Profile Form / Details */}
       <motion.div
@@ -367,9 +420,25 @@ const Profile = () => {
                 <div>
                   <p className="text-sm text-gray-500">Member Since</p>
                   <p className="font-medium text-gray-900">
-                    {userProfile?.createdAt
-                      ? new Date(userProfile.createdAt.seconds * 1000).toLocaleDateString()
-                      : '-'}
+                    {(() => {
+                      if (!userProfile?.createdAt) return '-';
+                      
+                      let date: Date;
+                      if (userProfile.createdAt instanceof Date) {
+                        date = userProfile.createdAt;
+                      } else if (userProfile.createdAt && typeof userProfile.createdAt === 'object' && 'seconds' in userProfile.createdAt) {
+                        // Firestore Timestamp
+                        date = new Date(userProfile.createdAt.seconds * 1000);
+                      } else if (userProfile.createdAt && typeof userProfile.createdAt === 'object' && 'toDate' in userProfile.createdAt) {
+                        // Firestore Timestamp with toDate method
+                        date = userProfile.createdAt.toDate();
+                      } else {
+                        // Try to parse as string or number
+                        date = new Date(userProfile.createdAt);
+                      }
+                      
+                      return date && !isNaN(date.getTime()) ? date.toLocaleDateString() : '-';
+                    })()}
                   </p>
                 </div>
               </div>

@@ -20,8 +20,10 @@ import Profile from './pages/Profile';
 import Assets from './pages/Assets';
 import Budgets from './pages/Budgets';
 import AdminUsers from './pages/AdminUsers';
+import AdminDashboard from './pages/AdminDashboard';
 import Layout from './components/layout/Layout';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
   const { currentUser, loading, userProfile } = useAuth();
@@ -264,6 +266,54 @@ function App() {
             </Layout>
           ) : (
             <Navigate to="/dashboard" replace />
+          )
+        }
+      />
+      <Route
+        path="/admin/dashboard"
+        element={
+          currentUser ? (
+            <Layout>
+              <ProtectedRoute requireAdmin>
+                <AdminDashboard />
+              </ProtectedRoute>
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/admin/approvals"
+        element={
+          currentUser ? (
+            <Layout>
+              <ProtectedRoute allowedRoles={['admin', 'project_manager', 'finance']}>
+                <div className="text-center py-12">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">Approvals Queue</h2>
+                  <p className="text-gray-600">Coming soon - Approval management interface</p>
+                </div>
+              </ProtectedRoute>
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/admin/verifications"
+        element={
+          currentUser ? (
+            <Layout>
+              <ProtectedRoute allowedRoles={['admin', 'project_manager']}>
+                <div className="text-center py-12">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">Task Verifications</h2>
+                  <p className="text-gray-600">Coming soon - Task verification interface</p>
+                </div>
+              </ProtectedRoute>
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
           )
         }
       />

@@ -33,7 +33,7 @@ interface DashboardStats {
 }
 
 const Dashboard: React.FC = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, currentUser } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalTasks: 0,
     completedTasks: 0,
@@ -375,7 +375,7 @@ const Dashboard: React.FC = () => {
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-800">
-            Welcome back, {userProfile?.displayName?.split(' ')[0] || 'User'}! 👋
+            Welcome back, {userProfile?.displayName?.split(' ')[0] || currentUser?.displayName?.split(' ')[0] || userProfile?.email?.split('@')[0] || currentUser?.email?.split('@')[0] || 'User'}! 👋
           </h1>
           <p className="text-secondary-500 mt-1">
             Here's what's happening with your projects today.

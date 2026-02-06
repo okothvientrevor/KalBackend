@@ -362,3 +362,250 @@ export interface FilterOptions {
   tags?: string[];
   category?: string[];
 }
+
+// Update/Activity Types for Progress Tracking
+export interface Update {
+  id: string;
+  title: string;
+  content: string;
+  type: 'status_change' | 'comment' | 'progress_update' | 'document_upload' | 'milestone' | 'system';
+  authorId: string;
+  authorName: string;
+  authorPhotoURL?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  attachments?: Attachment[];
+  previousValue?: any;
+  newValue?: any;
+  metadata?: {
+    [key: string]: any;
+  };
+}
+
+// Progress Entry
+export interface ProgressEntry {
+  id: string;
+  percentage: number;
+  description: string;
+  authorId: string;
+  authorName: string;
+  createdAt: Date;
+  milestone?: string;
+  hoursWorked?: number;
+}
+
+// Next Action Item
+export interface NextAction {
+  id: string;
+  title: string;
+  description?: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  dueDate?: Date;
+  priority: TaskPriority;
+  isCompleted: boolean;
+  completedAt?: Date;
+  completedBy?: string;
+  createdBy: string;
+  createdAt: Date;
+}
+
+// Document Category for better organization
+export type DocumentCategory = 'specification' | 'drawing' | 'report' | 'invoice' | 'contract' | 'certificate' | 'photo' | 'other';
+
+// Extended Task and Project interfaces with updates
+export interface TaskWithUpdates extends Task {
+  updates: Update[];
+  progressEntries: ProgressEntry[];
+  nextActions: NextAction[];
+}
+
+export interface ProjectWithUpdates extends Project {
+  updates: Update[];
+  progressEntries: ProgressEntry[];
+  nextActions: NextAction[];
+}
+
+// ==================== PERMISSIONS SYSTEM ====================
+
+// Permission Actions
+export type PermissionAction = 'create' | 'read' | 'update' | 'delete' | 'approve' | 'export' | 'manage';
+
+// Permission Resources
+export type PermissionResource = 
+  | 'tasks' 
+  | 'projects' 
+  | 'expenditures' 
+  | 'documents' 
+  | 'users' 
+  | 'reports' 
+  | 'budgets'
+  | 'audit_logs'
+  | 'settings'
+  | 'assets'
+  | 'team';
+
+// Single Permission
+export interface Permission {
+  resource: PermissionResource;
+  actions: PermissionAction[];
+}
+
+// Role-based Permissions Configuration
+export interface RolePermissions {
+  role: UserRole;
+  permissions: Permission[];
+  description: string;
+}
+
+// User-specific Permission Override
+export interface UserPermissionOverride {
+  userId: string;
+  resource: PermissionResource;
+  actions: PermissionAction[];
+  grantedBy: string;
+  grantedAt: Date;
+  expiresAt?: Date;
+  reason?: string;
+}
+
+// ==================== APPROVAL WORKFLOWS ====================
+
+// Approval Status Extended
+export type ApprovalWorkflowStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired';
+
+// Approval Levels
+export type ApprovalLevel = 'team_lead' | 'project_manager' | 'finance_officer' | 'admin';
+
+// Approval Request
+export interface ApprovalRequest {
+  id: string;
+  entityType: 'task' | 'project' | 'expenditure' | 'budget' | 'document';
+  entityId: string;
+  entityName: string;
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: Date;
+  currentLevel: ApprovalLevel;
+  requiredLevels: ApprovalLevel[];
+  status: ApprovalWorkflowStatus;
+  approvals: ApprovalStep[];
+  comments?: string;
+  metadata?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Approval Step in Workflow
+export interface ApprovalStep {
+  level: ApprovalLevel;
+  approverId?: string;
+  approverName?: string;
+  status: ApprovalWorkflowStatus;
+  action?: 'approved' | 'rejected';
+  comments?: string;
+  timestamp?: Date;
+  notifiedAt?: Date;
+}
+
+// Task Verification (Admin Sign-off)
+export interface TaskVerification extends ApprovalRequest {
+  taskId: string;
+  completedBy: string;
+  completedByName: string;
+  completedAt: Date;
+  verificationNotes?: string;
+  verifiedBy?: string;
+  verifiedByName?: string;
+  verifiedAt?: Date;
+}
+
+// Expenditure Approval Workflow
+export interface ExpenditureApprovalWorkflow {
+  expenditureId: string;
+  currentStage: 'team_lead' | 'project_manager' | 'accounts' | 'completed' | 'rejected';
+  stages: {
+    team_lead: ApprovalStep;
+    project_manager: ApprovalStep;
+    accounts: ApprovalStep;
+  };
+  finalStatus: 'pending' | 'approved' | 'rejected';
+  completedAt?: Date;
+}
+
+// ==================== USER INVITATION & MANAGEMENT ====================
+
+// User Invitation
+export interface UserInvitation {
+  id: string;
+  email: string;
+  role: UserRole;
+  department?: string;
+  position?: string;
+  invitedBy: string;
+  invitedByName: string;
+  invitedAt: Date;
+  expiresAt: Date;
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled';
+  tempPassword?: string;
+  acceptedAt?: Date;
+  metadata?: Record<string, any>;
+}
+
+// User Creation by Admin
+export interface AdminUserCreation {
+  email: string;
+  displayName: string;
+  tempPassword: string;
+  role: UserRole;
+  department?: string;
+  position?: string;
+  phone?: string;
+  mustChangePassword: boolean;
+  sendWelcomeEmail: boolean;
+  customPermissions?: Permission[];
+}
+
+// ==================== DASHBOARD STATS (ROLE-SPECIFIC) ====================
+
+export interface AdminDashboardStats extends DashboardStats {
+  totalUsers: number;
+  activeUsers: number;
+  pendingApprovals: number;
+  pendingVerifications: number;
+  systemHealth: {
+    storageUsed: number;
+    storageLimit: number;
+    activeConnections: number;
+    errorRate: number;
+  };
+  recentActivity: AuditLog[];
+  criticalAlerts: number;
+}
+
+export interface UserDashboardStats {
+  myTasks: number;
+  myCompletedTasks: number;
+  myOverdueTasks: number;
+  myProjects: number;
+  pendingApprovals: number;
+  recentUpdates: Update[];
+}
+
+// ==================== NOTIFICATION ENHANCEMENTS ====================
+
+export interface NotificationPreferences {
+  email: boolean;
+  push: boolean;
+  inApp: boolean;
+  digest: 'none' | 'daily' | 'weekly';
+}
+
+export interface EnhancedNotification extends Notification {
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  actionUrl?: string;
+  actionLabel?: string;
+  requiresAction: boolean;
+  expiresAt?: Date;
+  relatedUsers?: string[];
+}

@@ -21,6 +21,7 @@ import {
   CurrencyDollarIcon,
   ChevronDownIcon,
   ShieldCheckIcon,
+  DocumentCheckIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types';
@@ -52,7 +53,10 @@ const navigation: NavItem[] = [
 ];
 
 const adminNavigation: NavItem[] = [
+  { name: 'Admin Dashboard', href: '/admin/dashboard', icon: ChartBarIcon, roles: ['admin'] },
   { name: 'User Management', href: '/admin/users', icon: ShieldCheckIcon, roles: ['admin'] },
+  { name: 'Approvals', href: '/admin/approvals', icon: ClipboardDocumentCheckIcon, roles: ['admin', 'project_manager', 'finance'] },
+  { name: 'Verifications', href: '/admin/verifications', icon: DocumentCheckIcon, roles: ['admin', 'project_manager'] },
 ];
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
@@ -60,7 +64,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [_expandedMenu, _setExpandedMenu] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { userProfile, signOut } = useAuth();
+  const { userProfile, currentUser, signOut } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -244,14 +248,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="p-4 border-t border-gray-100">
             <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
               <div className="avatar avatar-md bg-primary-100 text-primary-700">
-                {userProfile?.displayName?.[0]?.toUpperCase() || 'U'}
+                {userProfile?.displayName?.[0]?.toUpperCase() || userProfile?.email?.[0]?.toUpperCase() || 'U'}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-secondary-800 truncate">
-                  {userProfile?.displayName || 'User'}
+                  {userProfile?.displayName || userProfile?.email?.split('@')[0] || 'User'}
                 </p>
                 <p className="text-xs text-secondary-500 capitalize">
-                  {userProfile?.role?.replace('_', ' ') || 'Member'}
+                  {userProfile?.role ? userProfile.role.replace('_', ' ') : 'Member'}
                 </p>
               </div>
             </div>
@@ -310,7 +314,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Menu as="div" className="relative">
                 <Menu.Button className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-100 transition-colors">
                   <div className="avatar avatar-sm bg-primary-100 text-primary-700">
-                    {userProfile?.displayName?.[0]?.toUpperCase() || 'U'}
+                    {userProfile?.displayName?.[0]?.toUpperCase() || userProfile?.email?.[0]?.toUpperCase() || 'U'}
                   </div>
                   <ChevronDownIcon className="w-4 h-4 text-secondary-500" />
                 </Menu.Button>
@@ -327,10 +331,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Menu.Items className="dropdown-menu w-56">
                     <div className="px-4 py-3 border-b border-gray-100">
                       <p className="text-sm font-medium text-secondary-800">
-                        {userProfile?.displayName || 'User'}
+                        {userProfile?.displayName || userProfile?.email?.split('@')[0] || 'User'}
                       </p>
                       <p className="text-xs text-secondary-500 truncate">
-                        {userProfile?.email}
+                        {userProfile?.email || currentUser?.email}
                       </p>
                     </div>
                     <div className="py-1">
