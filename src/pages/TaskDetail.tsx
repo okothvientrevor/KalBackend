@@ -284,13 +284,14 @@ const TaskDetail: React.FC = () => {
   };
 
   const getStatusColor = (status: TaskStatus) => {
-    const colors = {
+    const colors: Record<TaskStatus, string> = {
       todo: 'text-gray-700 bg-gray-100',
       in_progress: 'text-blue-700 bg-blue-100',
       completed: 'text-green-700 bg-green-100',
       verified: 'text-purple-700 bg-purple-100',
+      pending_approval: 'text-yellow-700 bg-yellow-100',
     };
-    return colors[status];
+    return colors[status] || 'text-gray-700 bg-gray-100';
   };
 
   const getUpdateIcon = (type: string) => {
@@ -457,10 +458,13 @@ const TaskDetail: React.FC = () => {
             </div>
           </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
+              {/* eslint-disable-next-line react/forbid-dom-props */}
               <div
-                className="bg-blue-600 h-2 rounded-full"
-                style={{ width: `${Math.min(((task.actualHours || 0) / (task.estimatedHours || 1)) * 100, 100)}%` }}
-              ></div>
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${Math.min(((task.actualHours || 0) / (task.estimatedHours || 1)) * 100, 100)}%` 
+                }}
+              />
             </div>
         </div>
 
@@ -481,10 +485,13 @@ const TaskDetail: React.FC = () => {
           </div>
           {task.subtasks && task.subtasks.length > 0 && (
             <div className="w-full bg-gray-200 rounded-full h-2">
+              {/* eslint-disable-next-line react/forbid-dom-props */}
               <div
-                className="bg-green-600 h-2 rounded-full"
-                style={{ width: `${(task.subtasks.filter(s => s.isCompleted).length / task.subtasks.length) * 100}%` }}
-              ></div>
+                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${(task.subtasks.filter(s => s.isCompleted).length / task.subtasks.length) * 100}%` 
+                }}
+              />
             </div>
           )}
         </div>

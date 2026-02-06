@@ -21,10 +21,36 @@ export interface User {
 }
 
 // Task Status
-export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'verified';
+export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'verified' | 'pending_approval';
 
 // Task Priority
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
+
+// Status Update Types
+export type StatusUpdateType = 
+  | 'project_started' 
+  | 'in_progress'
+  | 'awaiting_finances'
+  | 'materials_ordered'
+  | 'on_hold'
+  | 'testing_phase'
+  | 'ready_for_review'
+  | 'completed'
+  | 'custom';
+
+// Status Update Interface
+export interface StatusUpdate {
+  id: string;
+  status: StatusUpdateType;
+  customStatus?: string;
+  message: string;
+  timestamp: Date;
+  userId: string;
+  userName: string;
+  userPhotoURL?: string;
+  attachments?: Attachment[];
+  isCompleted: boolean;
+}
 
 // Task Interface
 export interface Task {
@@ -51,6 +77,9 @@ export interface Task {
   approvalStatus?: ApprovalStatus;
   approvedBy?: string;
   approvedAt?: Date;
+  rejectionReason?: string;
+  pendingApproval?: boolean;
+  statusUpdates?: StatusUpdate[];
   isRecurring?: boolean;
   recurringPattern?: RecurringPattern;
   createdAt: Date;
@@ -110,8 +139,8 @@ export interface AttachmentVersion {
   uploadedBy: string;
 }
 
-// Project Status
-export type ProjectStatus = 'not_started' | 'active' | 'on_hold' | 'delayed' | 'completed' | 'cancelled';
+// Project Status - Extended for approval workflow
+export type ProjectStatus = 'not_started' | 'active' | 'on_hold' | 'delayed' | 'completed' | 'cancelled' | 'pending_approval';
 
 // Project Interface
 export interface Project {
@@ -136,6 +165,11 @@ export interface Project {
   progress: number;
   createdAt: Date;
   updatedAt: Date;
+  statusUpdates?: StatusUpdate[];
+  pendingApproval?: boolean;
+  approvedBy?: string;
+  approvedAt?: Date;
+  rejectionReason?: string;
 }
 
 // Team Member
@@ -269,18 +303,47 @@ export interface Document {
   accessRoles: UserRole[];
 }
 
-// Notification Interface
+// ==================== NOTIFICATIONS ====================
+
+export type NotificationType = 
+  | 'task_assigned'
+  | 'task_due'
+  | 'task_completed'
+  | 'task_approved'
+  | 'task_rejected'
+  | 'project_assigned'
+  | 'project_completed'
+  | 'project_approved'
+  | 'project_rejected'
+  | 'project_update'
+  | 'expense_submitted'
+  | 'expense_approved'
+  | 'expense_rejected'
+  | 'team_member_added'
+  | 'deadline_reminder'
+  | 'budget_alert'
+  | 'approval_required'
+  | 'approval_completed'
+  | 'comment_added'
+  | 'mention'
+  | 'system';
+
 export interface Notification {
   id: string;
-  type: 'task_assigned' | 'task_due' | 'task_completed' | 'approval_required' | 'approval_completed' | 'budget_alert' | 'comment_added' | 'mention' | 'system';
+  type: NotificationType;
   title: string;
   message: string;
-  recipientId: string;
+  userId: string; // recipient
+  recipientId?: string; // legacy support
   senderId?: string;
   senderName?: string;
+  link?: string;
   entityType?: string;
   entityId?: string;
-  isRead: boolean;
+  relatedId?: string;
+  relatedType?: 'task' | 'project' | 'expense';
+  isRead?: boolean; // legacy support
+  read: boolean;
   createdAt: Date;
   readAt?: Date;
 }

@@ -300,15 +300,16 @@ const ProjectDetail: React.FC = () => {
   };
 
   const getStatusColor = (status: ProjectStatus) => {
-    const colors = {
+    const colors: Record<ProjectStatus, string> = {
       not_started: 'text-gray-700 bg-gray-100',
       active: 'text-blue-700 bg-blue-100',
       on_hold: 'text-yellow-700 bg-yellow-100',
       delayed: 'text-orange-700 bg-orange-100',
       completed: 'text-green-700 bg-green-100',
       cancelled: 'text-red-700 bg-red-100',
+      pending_approval: 'text-purple-700 bg-purple-100',
     };
-    return colors[status];
+    return colors[status] || 'text-gray-700 bg-gray-100';
   };
 
   const getPriorityColor = (priority: TaskPriority) => {
@@ -472,10 +473,11 @@ const ProjectDetail: React.FC = () => {
             </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
+            {/* eslint-disable-next-line react/forbid-dom-props */}
             <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
-            ></div>
+            />
           </div>
           <p className="text-xs text-secondary-500 mt-2">
             {tasks.filter(t => t.status === 'completed' || t.status === 'verified').length} of {tasks.length} tasks completed
@@ -495,10 +497,11 @@ const ProjectDetail: React.FC = () => {
             </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
+            {/* eslint-disable-next-line react/forbid-dom-props */}
             <div
               className={`h-2 rounded-full transition-all duration-300 ${getBudgetUsageColor()}`}
               style={{ width: `${Math.min((project.actualSpent / project.budget) * 100, 100)}%` }}
-            ></div>
+            />
           </div>
           <p className="text-xs text-secondary-500 mt-2">
             {Math.round((project.actualSpent / project.budget) * 100)}% used
